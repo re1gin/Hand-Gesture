@@ -127,7 +127,6 @@ def activate_gesture_action(gesture_id):
         17: lambda: pyautogui.hotkey('shift', 'p'),
         18: lambda: pyautogui.scroll(SCROLL_AMOUNT),
         19: lambda: pyautogui.scroll(-SCROLL_AMOUNT),
-        
         20: lambda: pyautogui.hotkey('alt', 'left'),
         21: lambda: pyautogui.hotkey('alt', 'right'),
     }
