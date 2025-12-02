@@ -9,7 +9,7 @@ Sistem ini memungkinkan Anda mengontrol video YouTube, peramban Chrome, dan fung
 
 ## 1\. ⚙️ Prasyarat & Instalasi
 
-Pastikan Anda memiliki Python (disarankan versi 3.8+) terinstal di sistem Anda.
+Pastikan Anda telah menginstal **Python (3.8+)** di sistem Anda.
 
 ### A. Instalasi Pustaka
 
@@ -21,22 +21,22 @@ pip install opencv-python mediapipe numpy tensorflow keras pyautogui webbrowser
 
 ### B. Struktur Folder Proyek V4
 
-Pastikan struktur folder proyek Anda telah diperbarui dan terlihat seperti ini:
+Pastikan struktur folder proyek Anda telah diperbarui untuk versi 4:
 
 ```
 YouTube_Gesture_Controller/
-├── keypoint_collector_v4.py
-├── keypoint_trainer_v4.py
-├── realtime_controller_v4.py
-├── keypoint_dataset_v4/  <-- Folder data baru (16 kelas)
-└── keypoint_model_v4/    <-- Folder model baru
+├── keypoint_collector_v4.py    # Pengumpul data (16 kelas)
+├── keypoint_trainer_v4.py      # Pelatih model (16 kelas)
+├── realtime_controller_v4.py   # Kontrol real-time
+├── keypoint_dataset_v4/        # <-- Folder data baru (minimal 250 sampel per kelas)
+└── keypoint_model_v4/          # <-- Model output: youtube_controller_mlp.h5
 ```
 
 -----
 
 ## 2\. 🖐️ Tahap Pelatihan Model (Training)
 
-Karena Anda menggunakan 16 gestur baru, model harus dilatih ulang.
+Model harus dilatih ulang untuk mengenali 16 gestur yang baru.
 
 ### A. Pengumpulan Data (Running `keypoint_collector_v4.py`)
 
@@ -45,9 +45,8 @@ Karena Anda menggunakan 16 gestur baru, model harus dilatih ulang.
     python keypoint_collector_v4.py
     ```
 2.  Ikuti instruksi di konsol. Anda perlu mengumpulkan data untuk **16 kelas gestur** baru.
-3.  Pilih gestur, lalu posisikan tangan Anda di depan kamera.
-4.  Tekan tombol **[SPASI]** berulang kali (target **250 kali per gestur**) untuk mengambil sampel *keypoint*. Pastikan posisi tangan Anda bervariasi agar model menjadi **robust**.
-5.  Ulangi proses ini hingga semua **16 gestur** mencapai target 250 sampel di folder `keypoint_dataset_v4`.
+3.  **Target:** Kumpulkan $\ge 250$ sampel untuk setiap gestur. Pastikan variasi posisi tangan agar model **robust** (kuat).
+4.  Tekan **[SPASI]** berulang kali untuk mengambil sampel.
 
 ### B. Pelatihan Model (Running `keypoint_trainer_v4.py`)
 
@@ -55,23 +54,22 @@ Karena Anda menggunakan 16 gestur baru, model harus dilatih ulang.
     ```bash
     python keypoint_trainer_v4.py
     ```
-2.  Model **MLP (Multi-Layer Perceptron)** akan dikompilasi dengan **16 *output classes***.
-3.  Model terbaik akan dilatih, dan yang paling akurat akan disimpan sebagai **`keypoint_model_v4/youtube_controller_mlp.h5`**.
+2.  Model **MLP (Multi-Layer Perceptron)** akan dilatih dengan **16 *output classes***.
+3.  Model terbaik akan disimpan ke dalam folder `keypoint_model_v4/`.
 
 -----
 
 ## 3\. ✨ Cara Penggunaan (Real-Time Control)
 
-Setelah model **V4** selesai dilatih, Anda siap menggunakannya.
+Setelah model **V4** selesai dilatih dan disimpan, Anda siap menggunakannya.
 
-1.  **Pastikan Chrome Aktif:** Buka *browser* **Google Chrome** (atau aplikasi lain yang ingin Anda kontrol).
+1.  **Aktivasi Chrome:** Buka *browser* **Google Chrome** (atau aplikasi lain yang ingin Anda kontrol) dan pastikan jendela tersebut aktif (fokus).
 2.  **Jalankan Kontroler:**
     ```bash
     python realtime_controller_v4.py
     ```
-3.  Jendela kamera akan terbuka.
-4.  Lakukan gestur yang Anda inginkan.
-5.  Jika *confidence* gestur statis $\ge 85\%$, aksi yang dipetakan akan dijalankan. Untuk gestur dinamis (*Cursor* dan *Scroll*), aksi akan dijalankan terus menerus selama gestur terdeteksi.
+3.  Jendela kamera akan terbuka, menampilkan tangan Anda dan status deteksi.
+4.  Lakukan gestur. Aksi akan dijalankan jika *confidence* deteksi gestur statis $\ge 85\%$.
 
 -----
 
@@ -82,26 +80,24 @@ Sistem ini memetakan 16 gestur tangan ke kontrol media, navigasi peramban, dan f
 | ID Kelas | Gestur Tangan | Label Data | Aksi (Tombol/Perintah) | Tipe |
 | :---: | :---: | :---: | :---: | :---: |
 | 0 | **Telapak Tangan Terbuka** | `open_palm` | **Netral** | Statis |
-| 1 | **Tangan Mengepal** | `fist` | `Spacebar` | Statis (Play/Pause) |
-| 2 | **Jempol Ke Atas** | `thumb_up` | `Panah Kiri` ($\leftarrow$) | Statis (Rewind) |
-| 3 | **Jempol Ke Bawah** | `thumb_down` | `Panah Kanan` ($\rightarrow$) | Statis (Forward) |
-| 4 | **Telunjuk Ke Atas** | `index_up` | `Panah Atas` ($\uparrow$) | Statis (Volume Up) |
-| 5 | **Telunjuk Ke Bawah** | `index_down` | `Panah Bawah` ($\downarrow$) | Statis (Volume Down) |
-| 6 | **Tangan Berbentuk 'C'** | `c_shape` | `M` | Statis (Mute/Unmute) |
-| 7 | **Tanda 'OK'** | `ok_sign` | `Enter` | Statis (Pilih/Klik) |
-| 8 | **Dua Jari Lurus** (Telunjuk & Tengah) | `two_fingers_up` | **Arahkan Kursor** | **Dinamis (Mouse Move)** |
-| 9 | **Tiga Jari Lurus** (Jempol & Kelingking terlipat) | `three_fingers_up` | **Scroll** | **Dinamis (Mouse Scroll)** |
-| 10 | **Empat Jari Lurus** (Jempol terlipat) | `four_fingers` | `F` | Statis (Fullscreen) |
-| 11 | **Satu Jari Miring 90°** | `index_side_90` | `Tab` | Statis (Navigasi Next Element) |
-| 12 | **Dua Jari Miring 90°** | `two_fingers_side_90` | `webbrowser.open()` | Statis (Buka YouTube Baru) |
-| 13 | **Tiga Jari Miring 90°** | `three_fingers_side_90` | `Ctrl + W` | Statis (Tutup Tab/YouTube) |
-| 14 | **Jari Kelingking Lurus** | `pinky_up` | `Esc` | Statis (Escape/Keluar) |
-| 15 | ***Swipe* Atas/Bawah** | `swipe_up_down` | **Scroll** | **Dinamis (Mouse Scroll)** |
+| 1 | **Tangan Mengepal** | `fist` | `Spacebar` (Play/Pause) | Statis |
+| 2 | **Jempol Ke Atas** | `thumb_up` | `Panah Kiri` ($\leftarrow$) (Rewind) | Statis |
+| 3 | **Jempol Ke Bawah** | `thumb_down` | `Panah Kanan` ($\rightarrow$) (Forward) | Statis |
+| 4 | **Telunjuk Ke Atas** | `index_up` | `Panah Atas` ($\uparrow$) (Volume Up) | Statis |
+| 5 | **Telunjuk Ke Bawah** | `index_down` | `Panah Bawah` ($\downarrow$) (Volume Down) | Statis |
+| 6 | **Tangan Berbentuk 'C'** | `c_shape` | `M` (Mute/Unmute) | Statis |
+| 7 | **Tanda 'OK'** | `ok_sign` | `Enter` (Pilih/Klik) | Statis |
+| 8 | **Dua Jari Lurus** | `two_fingers_up` | **Arahkan Kursor** | **Dinamis (Mouse Move)** |
+| 9 | **Tiga Jari Lurus** | `three_fingers_up` | **Scroll** | **Dinamis (Mouse Scroll)** |
+| 10 | **Empat Jari Lurus** | `four_fingers` | `F` (Fullscreen) | Statis |
+| 11 | **Satu Jari Miring 90°** | `index_side_90` | `Tab` (Navigasi Next Element) | Statis |
+| 12 | **Dua Jari Miring 90°** | `two_fingers_side_90` | `webbrowser.open()` (Buka YouTube Baru) | Statis |
+| 13 | **Tiga Jari Miring 90°** | `three_fingers_side_90` | `Ctrl + W` (Tutup Tab/YouTube) | Statis |
+| 14 | **Jari Kelingking Lurus** | `pinky_up` | `Esc` (Escape/Keluar) | Statis |
+| 15 | ***Swipe* Atas/Bawah** | `swipe_up_down` | **Scroll Cepat** | **Dinamis (Mouse Scroll)** |
 
 ***Catatan tentang Gestur Dinamis (ID 8, 9, 15):***
-
-  * Model **hanya mendeteksi bentuk tangan statis** untuk ID 8, 9, dan 15.
-  * *Script* **`realtime_controller_v4.py`** kemudian **menggunakan posisi pergelangan tangan** saat gestur tersebut aktif untuk menghitung gerakan kursor (`pyautogui.move()`) atau gulir (`pyautogui.scroll()`).
+Gestur dinamis tidak menggunakan gerakan tangan yang di-traktiran (dipelajari) oleh model, melainkan **model mendeteksi bentuk tangan statisnya**, lalu *script* `realtime_controller_v4.py` menggunakan **posisi pergelangan tangan** saat gestur tersebut aktif untuk menghitung gerakan kursor (`pyautogui.move()`) atau gulir (`pyautogui.scroll()`).
 
 -----
 
