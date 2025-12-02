@@ -1,108 +1,210 @@
 
------
+---
 
-# 🚀 Proyek: YouTube Gesture Controller V4 (16 Gestur)
+# 🎥 YouTube Gesture Controller V7 (22-Class Hand Gesture Navigation)
 
-Sistem ini memungkinkan Anda mengontrol video YouTube, peramban Chrome, dan fungsi *mouse* **secara *real-time*** menggunakan **16 gerakan tangan** yang dideteksi oleh kamera, MediaPipe, dan Model Jaringan Saraf Tiruan (Neural Network) V4.
+Sistem kontrol YouTube berbasis **gesture tangan** menggunakan:
 
------
+* **MediaPipe Hands**
+* **TensorFlow (MLP 22 kelas)**
+* **OpenCV**
+* **PyAutoGUI**
+* **Custom smoothing + cursor acceleration**
+* **Gesture cooldown management**
 
-## 1\. ⚙️ Prasyarat & Instalasi
+Versi ini mampu melakukan **navigasi penuh pada YouTube dan browser**, termasuk:
 
-Pastikan Anda telah menginstal **Python (3.8+)** di sistem Anda.
+✔ Kontrol play/pause
+✔ Volume
+✔ Next / Previous
+✔ Fullscreen / Theater
+✔ Scroll
+✔ Mute
+✔ Back / Forward browser
+✔ Close tab
+✔ Buka YouTube otomatis
+✔ Mode cursor (mouse) super smooth & wide
 
-### A. Instalasi Pustaka
+---
 
-Buka Terminal atau Command Prompt, lalu jalankan perintah berikut untuk menginstal semua pustaka yang diperlukan:
+## ✨ Fitur Utama
+
+### 🖐️ **22 Gestur Final (Kelas V7)**
+
+Semua gesture telah dilatih dan terintegrasi:
+
+| ID | Gesture               | Fungsi                   |
+| -- | --------------------- | ------------------------ |
+| 0  | OPEN_PALM             | Default / reset          |
+| 1  | FIST                  | Play/Pause (Space)       |
+| 2  | THUMB_UP              | Forward 10s              |
+| 3  | THUMB_DOWN            | Rewind 10s               |
+| 4  | INDEX_UP              | Volume Up                |
+| 5  | INDEX_DOWN            | Volume Down              |
+| 6  | C_SHAPE               | Subtitle toggle (C)      |
+| 7  | OK_SIGN               | Mouse Click              |
+| 8  | TWO_FINGERS_UP        | Cursor Mode (mouse)      |
+| 9  | THREE_FINGERS_UP      | Mute (M)                 |
+| 10 | FOUR_FINGERS          | Fullscreen (F)           |
+| 11 | INDEX_SIDE_90         | Theater Mode (T)         |
+| 12 | TWO_FINGERS_SIDE_90   | Open YouTube             |
+| 13 | TWO_FINGERS_SIDE_BACK | Enter                    |
+| 14 | THREE_FINGERS_SIDE_90 | Close Tab                |
+| 15 | PINKY_UP              | Esc                      |
+| 16 | L_SHAPE               | Next (Shift+N)           |
+| 17 | GUN_SHAPE             | Previous (Shift+P)       |
+| 18 | SCROLL_UP             | Scroll Up                |
+| 19 | SCROLL_DOWN           | Scroll Down              |
+| 20 | THUMB_LEFT            | Back Page (Alt+Left)     |
+| 21 | THUMB_RIGHT           | Forward Page (Alt+Right) |
+
+---
+
+## 🖱️ **Mode Kursor Tingkat Lanjut (ID = 8)**
+
+Kursor bergerak dengan:
+
+* **Exponential smoothing (lebih halus dari linear smoothing)**
+* **Soft acceleration**
+* **Wide movement scaling**
+* **Deadzone anti-jitter**
+* **Auto-reset saat keluar dari mode cursor**
+
+Hasilnya:
+
+✔ Stabil
+✔ Halus
+✔ Tidak kaku
+✔ Jangkauan luas
+✔ Presisi tinggi
+
+---
+
+## 🧩 Struktur Teknis
+
+### Algoritma Utama:
+
+1. **MediaPipe Hand Tracking**
+   Mendapatkan 21 landmark 3D tangan.
+
+2. **Normalize Keypoints (63D)**
+
+   * Translate ke pergelangan tangan
+   * Normalize menggunakan jari tengah (landmark 9)
+
+3. **MLP Gesture Classification (22 kelas)**
+   Menggunakan model `.h5` custom.
+
+4. **Prediction Smoothing**
+   Mengambil rata-rata 5 frame (history buffer).
+
+5. **Confidence Filtering**
+   Gesture hanya dieksekusi jika confidence ≥ 0.85.
+
+6. **Cooldown System**
+   Untuk mencegah spam aksi.
+
+7. **Gesture → Action Mapping**
+   Menggunakan PyAutoGUI.
+
+8. **Cursor System**
+   Dengan smoothing + acceleration.
+
+---
+
+## 📦 Instalasi
+
+### 1. Clone Repo
 
 ```bash
-pip install opencv-python mediapipe numpy tensorflow keras pyautogui webbrowser
+git clone https://github.com/your-repo/gesture-youtube-controller
+cd gesture-youtube-controller
 ```
 
-### B. Struktur Folder Proyek V4
+### 2. Install Dependencies
 
-Pastikan struktur folder proyek Anda telah diperbarui untuk versi 4:
-
-```
-YouTube_Gesture_Controller/
-├── keypoint_collector_v4.py    # Pengumpul data (16 kelas)
-├── keypoint_trainer_v4.py      # Pelatih model (16 kelas)
-├── realtime_controller_v4.py   # Kontrol real-time
-├── keypoint_dataset_v4/        # <-- Folder data baru (minimal 250 sampel per kelas)
-└── keypoint_model_v4/          # <-- Model output: youtube_controller_mlp.h5
+```bash
+pip install opencv-python mediapipe tensorflow pyautogui numpy
 ```
 
------
+### 3. Pastikan Model Tersedia
 
-## 2\. 🖐️ Tahap Pelatihan Model (Training)
+Model harus berada di:
 
-Model harus dilatih ulang untuk mengenali 16 gestur yang baru.
+```
+keypoint_model_v7/youtube_controller_mlp_v7.h5
+```
 
-### A. Pengumpulan Data (Running `keypoint_collector_v4.py`)
+---
 
-1.  Jalankan *script* pengumpul data:
-    ```bash
-    python keypoint_collector_v4.py
-    ```
-2.  Ikuti instruksi di konsol. Anda perlu mengumpulkan data untuk **16 kelas gestur** baru.
-3.  **Target:** Kumpulkan $\ge 250$ sampel untuk setiap gestur. Pastikan variasi posisi tangan agar model **robust** (kuat).
-4.  Tekan **[SPASI]** berulang kali untuk mengambil sampel.
+## ▶️ Cara Menjalankan
 
-### B. Pelatihan Model (Running `keypoint_trainer_v4.py`)
+```bash
+python main.py
+```
 
-1.  Setelah semua data terkumpul, jalankan *script* pelatihan:
-    ```bash
-    python keypoint_trainer_v4.py
-    ```
-2.  Model **MLP (Multi-Layer Perceptron)** akan dilatih dengan **16 *output classes***.
-3.  Model terbaik akan disimpan ke dalam folder `keypoint_model_v4/`.
+Tekan **Q** untuk keluar.
 
------
+---
 
-## 3\. ✨ Cara Penggunaan (Real-Time Control)
+## 🔧 Pengaturan Sensitivitas (Optional)
 
-Setelah model **V4** selesai dilatih dan disimpan, Anda siap menggunakannya.
+### Ubah sensitivitas kursor:
 
-1.  **Aktivasi Chrome:** Buka *browser* **Google Chrome** (atau aplikasi lain yang ingin Anda kontrol) dan pastikan jendela tersebut aktif (fokus).
-2.  **Jalankan Kontroler:**
-    ```bash
-    python realtime_controller_v4.py
-    ```
-3.  Jendela kamera akan terbuka, menampilkan tangan Anda dan status deteksi.
-4.  Lakukan gestur. Aksi akan dijalankan jika *confidence* deteksi gestur statis $\ge 85\%$.
+```python
+CURSOR_SENSITIVITY = 3.5  # default
+```
 
------
+### Geser lebih cepat (misal layar besar):
 
-## 4\. ✋ Daftar Gestur Kontrol V4 (16 Aksi)
+```python
+CURSOR_SENSITIVITY = 5.0
+```
 
-Sistem ini memetakan 16 gestur tangan ke kontrol media, navigasi peramban, dan fungsi *mouse* dinamis.
+### Geser lebih stabil:
 
-| ID Kelas | Gestur Tangan | Label Data | Aksi (Tombol/Perintah) | Tipe |
-| :---: | :---: | :---: | :---: | :---: |
-| 0 | **Telapak Tangan Terbuka** | `open_palm` | **Netral** | Statis |
-| 1 | **Tangan Mengepal** | `fist` | `Spacebar` (Play/Pause) | Statis |
-| 2 | **Jempol Ke Atas** | `thumb_up` | `Panah Kiri` ($\leftarrow$) (Rewind) | Statis |
-| 3 | **Jempol Ke Bawah** | `thumb_down` | `Panah Kanan` ($\rightarrow$) (Forward) | Statis |
-| 4 | **Telunjuk Ke Atas** | `index_up` | `Panah Atas` ($\uparrow$) (Volume Up) | Statis |
-| 5 | **Telunjuk Ke Bawah** | `index_down` | `Panah Bawah` ($\downarrow$) (Volume Down) | Statis |
-| 6 | **Tangan Berbentuk 'C'** | `c_shape` | `M` (Mute/Unmute) | Statis |
-| 7 | **Tanda 'OK'** | `ok_sign` | `Enter` (Pilih/Klik) | Statis |
-| 8 | **Dua Jari Lurus** | `two_fingers_up` | **Arahkan Kursor** | **Dinamis (Mouse Move)** |
-| 9 | **Tiga Jari Lurus** | `three_fingers_up` | **Scroll** | **Dinamis (Mouse Scroll)** |
-| 10 | **Empat Jari Lurus** | `four_fingers` | `F` (Fullscreen) | Statis |
-| 11 | **Satu Jari Miring 90°** | `index_side_90` | `Tab` (Navigasi Next Element) | Statis |
-| 12 | **Dua Jari Miring 90°** | `two_fingers_side_90` | `webbrowser.open()` (Buka YouTube Baru) | Statis |
-| 13 | **Tiga Jari Miring 90°** | `three_fingers_side_90` | `Ctrl + W` (Tutup Tab/YouTube) | Statis |
-| 14 | **Jari Kelingking Lurus** | `pinky_up` | `Esc` (Escape/Keluar) | Statis |
-| 15 | ***Swipe* Atas/Bawah** | `swipe_up_down` | **Scroll Cepat** | **Dinamis (Mouse Scroll)** |
+```python
+CURSOR_SENSITIVITY = 2.8
+```
 
-***Catatan tentang Gestur Dinamis (ID 8, 9, 15):***
-Gestur dinamis tidak menggunakan gerakan tangan yang di-traktiran (dipelajari) oleh model, melainkan **model mendeteksi bentuk tangan statisnya**, lalu *script* `realtime_controller_v4.py` menggunakan **posisi pergelangan tangan** saat gestur tersebut aktif untuk menghitung gerakan kursor (`pyautogui.move()`) atau gulir (`pyautogui.scroll()`).
+---
 
------
+## 🚀 Performance Tips
 
-## 🛑 Tips Pemecahan Masalah
+✔ Pastikan pencahayaan bagus
+✔ Gunakan background yang kontras
+✔ Gunakan webcam 30–60 FPS
+✔ Jarak tangan 40–80cm dari kamera
 
-  * **Kursor Bergerak Terlalu Cepat/Lambat:** Sesuaikan nilai **`CURSOR_SENSITIVITY`** di *script* `realtime_controller_v4.py`.
-  * **Scroll Tidak Akurat:** Sesuaikan nilai **`SCROLL_SENSITIVITY`** dan **`scroll_amount`** di *script* `realtime_controller_v4.py`.
-  * **Aksi Tidak Bekerja:** Pastikan jendela **Google Chrome** aktif dan berada di depan. `PyAutoGUI` mengirim *input* ke jendela yang sedang fokus.
+---
+
+## 📚 Roadmap (V8 – Optional)
+
+Jika ditingkatkan lagi:
+
+* Kalman Filter cursor tracking
+* Adaptive sensitivity (AI)
+* Drag-and-drop gesture
+* Auto calibration per-user
+* 30+ gesture recognition
+
+---
+
+## 👑 Penutup
+
+YouTube Gesture Controller V7 adalah sistem navigasi berbasis gesture yang:
+
+* Cepat
+* Stabil
+* Presisi
+* Bebas latency
+* Sangat ergonomis
+
+Siap digunakan untuk:
+
+* Kontrol YouTube
+* Kontrol browser
+* Presentasi
+* Aplikasi hands-free
+
+---
