@@ -7,33 +7,40 @@ import time
 # ================== Setup MediaPipe ==================
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1,
-                      min_detection_confidence=0.7, min_tracking_confidence=0.5)
+                       min_detection_confidence=0.7, min_tracking_confidence=0.5)
 mp_drawing = mp.solutions.drawing_utils
 # =====================================================
 
 gestures = {
     # ID 0 - 7
-    'open_palm': 'Netral', 
-    'fist': 'Play/Pause', 
-    'thumb_up': 'Rewind', 
-    'thumb_down': 'Forward', 
-    'index_up': 'Vol Up', 
-    'index_down': 'Vol Down',
-    'c_shape': 'Mute', 
-    'ok_sign': 'Enter', 
+    'open_palm': 'Netral',          # ID 0
+    'fist': 'Play/Pause',           # ID 1
+    'thumb_up': 'Rewind',           # ID 2
+    'thumb_down': 'Forward',        # ID 3
+    'index_up': 'Vol Up',           # ID 4
+    'index_down': 'Vol Down',       # ID 5
+    'c_shape': 'Subtitle',          # ID 6
+    'ok_sign': 'Click',             # ID 7
     
     # ID 8 - 15
-    'two_fingers_up': 'Cursor',        
-    'three_fingers_up': 'Scroll',      
-    'four_fingers': 'Fullscreen', 
-    'index_side_90': 'Tab', 
-    'two_fingers_side_90': 'Open YT',   
-    'three_fingers_side_90': 'Close Tab',
-    'pinky_up': 'Esc',
-    'swipe_up_down': 'Scroll Logic'     
+    'two_fingers_up': 'Cursor',      # ID 8 (Dinamis)
+    'three_fingers_up': 'Mute',    # ID 9
+    'four_fingers': 'Fullscreen',    # ID 10
+    'index_side_90': 'Teater Mode',  # ID 11
+    'two_fingers_side_90': 'Open YT',# ID 12
+    'two_fingers_side_back': 'Enter',# ID 13 
+    'three_fingers_side_90': 'Close Tab',# ID 14
+    'pinky_up': 'Esc',               # ID 15
+
+    # ID 16 & 17 (GESTUR BARU)
+    'L_shape': 'Next (Shift+N)',     # ID 16: Jempol & Telunjuk (Lurus 90 derajat)
+    'gun_shape': 'Previous (Shift+P)', # ID 17: Jempol & Telunjuk (Membentuk Pistol)
+    
+    'two_fingers_up_other': 'Scroll Up',
+    'two_fingers_down_other': 'Scroll Down',
 }
-DATA_DIR = 'keypoint_dataset_v4' # Ubah ke versi 4
-num_samples = 250 # Jumlah sampel per gestur
+DATA_DIR = 'keypoint_dataset_v4'
+num_samples = 250
 
 # =====================================================
 # FUNGSI NORMALISASI KEYPOINT (Invarian Posisi & Skala)
@@ -71,7 +78,7 @@ time.sleep(1)
 
 # Visualisasi dan Instruksi
 os.system('cls' if os.name == 'nt' else 'clear')
-print("PENGUMPUL DATA KEYPOINT (16 GESTUR DINORMALISASI) - TARGET 250/GESTURE".center(80))
+print("PENGUMPUL DATA KEYPOINT (18 GESTUR DINORMALISASI) - TARGET 250/GESTURE".center(80))
 available_gestures = list(gestures.keys())
 
 # Variabel kontrol untuk keluar dari loop utama
@@ -81,37 +88,38 @@ while available_gestures and not quit_program:
     print("\n📦 Gesture belum selesai:")
     for i, g in enumerate(available_gestures, 1):
         n = len([f for f in os.listdir(os.path.join(DATA_DIR, g)) if f.endswith('.npy')])
-        print(f"  {i}. {gestures[g]:<15} → {n}/{num_samples} {'✅ SELESAI' if n>=num_samples else ''}")
+        # Menampilkan ID yang benar (i-1)
+        print(f" {i-1:<2}. {g:<20} -> {gestures[g]:<15} → {n}/{num_samples} {'✅ SELESAI' if n>=num_samples else ''}")
     
     try:
-        selection = input(f"\nPilih (1-{len(available_gestures)}) atau 'q' untuk keluar: ")
+        selection = input(f"\nPilih ID (0-{len(available_gestures)-1}) atau 'q' untuk keluar: ")
         if selection.lower() == 'q':
-            quit_program = True # Set flag untuk keluar dari loop utama
-            break # Keluar dari loop input gestur
-        current = available_gestures[int(selection) - 1]
+            quit_program = True
+            break
+        # Mengambil gestur berdasarkan ID (index)
+        current = available_gestures[int(selection)]
     except: 
-        print("Input salah!"); continue
+        print("Input salah! Masukkan ID angka yang valid atau 'q'."); continue
 
     if quit_program:
-        break # Keluar dari loop jika 'q' ditekan
+        break
 
     print(f"\n▶️ SEDANG: {gestures[current].upper()} - Siapkan Tangan Anda")
     time.sleep(1)
     
     # Hitung mundur
     for i in range(3,0,-1):
-         ret, f = cap.read()
-         if ret:
-             f = cv2.flip(f, 1) # Tambahkan flip di sini juga
-             cv2.putText(f, str(i), (280,240), cv2.FONT_HERSHEY_SIMPLEX, 6, (0,255,255), 15)
-             cv2.imshow('Keypoint Collector', f)
-             # Tambahkan waitKey di sini untuk memastikan jendela tetap responsif
-             if cv2.waitKey(1000) & 0xFF == ord('q'): 
-                 quit_program = True
-                 break
+        ret, f = cap.read()
+        if ret:
+            f = cv2.flip(f, 1)
+            cv2.putText(f, str(i), (280,240), cv2.FONT_HERSHEY_SIMPLEX, 6, (0,255,255), 15)
+            cv2.imshow('Keypoint Collector', f)
+            if cv2.waitKey(1000) & 0xFF == ord('q'): 
+                quit_program = True
+                break
     
     if quit_program:
-        break # Keluar jika 'q' ditekan selama hitungan mundur
+        break
 
     count = len([f for f in os.listdir(os.path.join(DATA_DIR, current)) if f.endswith('.npy')])
     
@@ -138,7 +146,7 @@ while available_gestures and not quit_program:
         overlay = frame.copy()
         cv2.rectangle(overlay, (0,420), (640,480), (0,0,0), -1)
         cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
-        cv2.putText(frame, "SPASI=Ambil Data  N=Selesai Gestur  R=Reset  Q=Keluar", (10,455),
+        cv2.putText(frame, "SPASI=Ambil Data  N=Selesai Gestur  R=Reset  Q=Keluar", (10,455),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255,255,255), 2)
 
         cv2.imshow('Keypoint Collector', frame)
@@ -179,7 +187,7 @@ while available_gestures and not quit_program:
             print("Folder gestur direset.")
             
     if quit_program:
-        break # Keluar dari loop akuisisi data
+        break
 
 if not available_gestures and not quit_program:
     print("\n🎉 SELESAI SEMUA GESTURE! Semua data siap untuk training.")

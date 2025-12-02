@@ -6,15 +6,24 @@ import time
 import pyautogui
 import webbrowser 
 
+# ================== Setup UI Parameters ==================
+FONT_FACE = cv2.FONT_HERSHEY_SIMPLEX
+FONT_SIZE = 0.5    # Ukuran font seragam
+FONT_THICKNESS = 1 # Ketebalan font seragam
+WHITE = (255, 255, 255)
+RED = (0, 0, 255)
+# =========================================================
+
 # ================== Setup MediaPipe ==================
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1,
-                      min_detection_confidence=0.7, min_tracking_confidence=0.5)
+                       min_detection_confidence=0.7, min_tracking_confidence=0.5)
 mp_drawing = mp.solutions.drawing_utils
 # =====================================================
 
 # FUNGSI NORMALISASI KEYPOINT (WAJIB SAMA DENGAN COLLECTOR & TRAINER)
 def normalize_keypoints(hand_landmarks):
+    """Menghasilkan vektor 63 dimensi yang dinormalisasi."""
     all_coords = np.array([[lm.x, lm.y, lm.z] for lm in hand_landmarks.landmark]) 
     wrist = all_coords[0, :2] 
     translated_coords = all_coords[:, :2] - wrist 
@@ -29,66 +38,93 @@ def normalize_keypoints(hand_landmarks):
 
 # =====================================================
 
-# Muat model yang telah dilatih
-MODEL_PATH = 'keypoint_model_v4/youtube_controller_mlp.h5'
+# Muat model yang telah dilatih (VERSI 6: 20 KELAS)
+MODEL_PATH = 'keypoint_model_v6/youtube_controller_mlp_v6.h5'
+NUM_CLASSES = 20
+
 try:
     model = tf.keras.models.load_model(MODEL_PATH)
-except:
-    print(f"Error: Model '{MODEL_PATH}' tidak ditemukan. Latih ulang model dengan 16 kelas!")
+    if model.output_shape[1] != NUM_CLASSES: 
+        print(f"Error: Model memiliki {model.output_shape[1]} kelas, harusnya {NUM_CLASSES} (V6).")
+        exit()
+except Exception as e:
+    print(f"Error: Model '{MODEL_PATH}' tidak ditemukan atau gagal dimuat. {e}")
+    print("Pastikan Anda sudah melatih model V6 (20 kelas)!")
     exit()
 
-# Mapping label BARU (16 Kelas)
+# Mapping label BARU (20 Kelas Final)
 gestures = {
+    # ID 0 - 7
     0:'OPEN_PALM (Default)', 1:'FIST (Play/Pause)', 2:'THUMB_UP (Rewind)', 
     3:'THUMB_DOWN (Forward)', 4:'INDEX_UP (Vol Up)', 5:'INDEX_DOWN (Vol Down)',
-    6:'C_SHAPE (Mute)', 7:'OK_SIGN (Enter)', 8:'TWO_FINGERS_UP (Cursor)', 
-    9:'THREE_FINGERS_UP (Scroll)', 10:'FOUR_FINGERS (Fullscreen)', 
-    11:'INDEX_SIDE_90 (Tab)', 12:'TWO_FINGERS_SIDE_90 (Open YT)', 
-    13:'THREE_FINGERS_SIDE_90 (Close Tab)', 14:'PINKY_UP (Esc)',
-    15:'SWIPE_UP_DOWN (Scroll Logic)' # Dipetakan ke ID 9/15 untuk Scroll
+    6:'C_SHAPE (Subtitle)',  
+    7:'OK_SIGN (Click)',         
+    
+    # ID 8 - 15
+    8:'TWO_FINGERS_UP (Cursor)', 
+    9:'THREE_FINGERS_UP (Mute)', 
+    10:'FOUR_FINGERS (Fullscreen)', 11:'INDEX_SIDE_90 (Teater Mode)', 
+    12:'TWO_FINGERS_SIDE_90 (Open YT)', 
+    13:'TWO_FINGERS_SIDE_BACK (Enter)',      
+    14:'THREE_FINGERS_SIDE_90 (Close Tab)',
+    15:'PINKY_UP (Esc)',
+    
+    # ID 16 - 19 (GESTUR BARU)
+    16:'L_SHAPE (Next)',      
+    17:'GUN_SHAPE (Previous)', 
+    18:'SCROLL_UP (Static)', 
+    19:'SCROLL_DOWN (Static)' 
 }
+
+# Fungsi Helper untuk mendapatkan Nama Gestur saja (sebelum kurung)
+def get_gesture_name(gesture_string):
+    return gesture_string.split(' (')[0]
+
 cap = cv2.VideoCapture(0)
 
 # Variabel Kontrol UX/Aksi
 PREDICTION_HISTORY = []
-HISTORY_SIZE = 5         
-MIN_CONFIDENCE = 0.85    
+HISTORY_SIZE = 5       
+MIN_CONFIDENCE = 0.85     
 LAST_ACTIVATION = time.time()
 ACTIVATION_COOLDOWN = 0.5 
 
 LAST_OPEN_YT = time.time()
-OPEN_YT_COOLDOWN = 30.0 
+OPEN_YT_COOLDOWN = 10.0 
 
-# Variabel Kursor dan Scroll (Logika Dinamis)
+# Variabel Kursor dan Scroll (Logika Dinamis/Statis)
 PREV_HAND_Y = None
 PREV_HAND_X = None
-SCROLL_SENSITIVITY = 15 # Kepekaan scroll
-CURSOR_SENSITIVITY = 2.5 # Kepekaan kursor
+CURSOR_SENSITIVITY = 2.5 
+SCROLL_AMOUNT = 200 
 
 def activate_gesture_action(gesture_id):
     """Memetakan ID gestur ke aksi PyAutoGUI dan mengontrol Cooldown."""
     global LAST_ACTIVATION, LAST_OPEN_YT
     
-    # Cooldown standar untuk aksi cepat (kecuali aksi kursor dan scroll)
-    if time.time() - LAST_ACTIVATION < ACTIVATION_COOLDOWN and gesture_id not in [8, 9, 15, 12]:
+    if time.time() - LAST_ACTIVATION < ACTIVATION_COOLDOWN and gesture_id not in [8, 12]:
         return
     
     action_map = {
-        # Aksi Kontrol Media
-        1: lambda: pyautogui.press('space'),       # FIST (Play/Pause)
-        2: lambda: pyautogui.press('left'),        # THUMB_UP (Rewind)
-        3: lambda: pyautogui.press('right'),       # THUMB_DOWN (Forward)
-        4: lambda: pyautogui.press('up'),          # INDEX_UP (Vol Up)
-        5: lambda: pyautogui.press('down'),        # INDEX_DOWN (Vol Down)
-        6: lambda: pyautogui.press('m'),           # C_SHAPE (Mute)
-        7: lambda: pyautogui.press('enter'),       # OK_SIGN (Enter/Pilih)
-        10: lambda: pyautogui.press('f'),          # FOUR_FINGERS (Fullscreen)
-        11: lambda: pyautogui.press('tab'),         # INDEX_SIDE_90 (Tab)
-        13: lambda: pyautogui.hotkey('ctrl', 'w'),  # THREE_FINGERS_SIDE_90 (Close Tab)
-        14: lambda: pyautogui.press('esc')          # PINKY_UP (Esc)
+        1: lambda: pyautogui.press('space'), 
+        2: lambda: pyautogui.press('left'),  
+        3: lambda: pyautogui.press('right'), 
+        4: lambda: pyautogui.press('up'),    
+        5: lambda: pyautogui.press('down'),  
+        6: lambda: pyautogui.press('c'),     
+        7: lambda: pyautogui.click(),        
+        9: lambda: pyautogui.press('m'),     
+        10: lambda: pyautogui.press('f'),    
+        11: lambda: pyautogui.press('t'),    
+        13: lambda: pyautogui.press('enter'),
+        14: lambda: pyautogui.hotkey('ctrl', 'w'),
+        15: lambda: pyautogui.press('esc'),  
+        16: lambda: pyautogui.hotkey('shift', 'n'),
+        17: lambda: pyautogui.hotkey('shift', 'p'),
+        18: lambda: pyautogui.scroll(SCROLL_AMOUNT),
+        19: lambda: pyautogui.scroll(-SCROLL_AMOUNT)
     }
     
-    # Aksi Khusus Buka YouTube (ID 12)
     if gesture_id == 12:
         if time.time() - LAST_OPEN_YT >= OPEN_YT_COOLDOWN:
             webbrowser.open('https://www.youtube.com', new=2)
@@ -101,63 +137,43 @@ def activate_gesture_action(gesture_id):
     action = action_map.get(gesture_id)
     if action:
         action()
-        print(f"✅ AKSI AKTIF: {gestures[gesture_id]}")
-        LAST_ACTIVATION = time.time() # Reset Cooldown Standar
+        print(f"✅ AKSI AKTIF: {gestures[gesture_id]}") 
+        LAST_ACTIVATION = time.time() 
 
 # =========================================================
-# FUNGSI DINAMIS KHUSUS (Kursor dan Scroll)
+# FUNGSI DINAMIS KHUSUS (Hanya Kursor - ID 8)
 # =========================================================
-def handle_cursor_and_scroll(frame, hand_landmarks, pred_class):
+def handle_cursor_movement(frame, hand_landmarks, pred_class):
     global PREV_HAND_Y, PREV_HAND_X
     
-    # Mengambil koordinat pergelangan tangan (landmark 0) dinormalisasi ke ukuran frame
     wrist_lm = hand_landmarks.landmark[0]
     hand_y = wrist_lm.y * frame.shape[0]
     hand_x = wrist_lm.x * frame.shape[1]
 
-    # Inisialisasi posisi awal
     if PREV_HAND_Y is None:
         PREV_HAND_Y = hand_y
         PREV_HAND_X = hand_x
         return
     
-    if pred_class in [8]: # Gestur Kursor (ID 8: TWO_FINGERS_UP)
-        # Hitung perubahan relatif
+    if pred_class == 8: # Gestur Kursor (ID 8: TWO_FINGERS_UP)
         dx = (hand_x - PREV_HAND_X) * CURSOR_SENSITIVITY
         dy = (hand_y - PREV_HAND_Y) * CURSOR_SENSITIVITY
         
-        # Pindahkan kursor (pyautogui.moveRel)
-        # Catatan: Tangan yang di-flip membuat X terbalik, dikalikan -1
         pyautogui.move(int(dx * -1), int(dy))
         
-        # Tampilkan status kursor di frame
-        cv2.putText(frame, "CURSOR ACTIVE", (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 100, 255), 2)
+        # Teks Kursor di kiri tengah (Ukuran Font Seragam, Putih)
+        cv2.putText(frame, "CURSOR ACTIVE", (20, 70), FONT_FACE, FONT_SIZE, WHITE, FONT_THICKNESS)
         
-    elif pred_class in [9, 15]: # Gestur Scroll (ID 9: THREE_FINGERS_UP, ID 15: SWIPE_UP_DOWN)
-        # Hitung perubahan vertikal
-        dy = hand_y - PREV_HAND_Y
-        
-        if abs(dy) > SCROLL_SENSITIVITY:
-            scroll_amount = 100 # Scroll 100 unit
-            if dy < 0: # Tangan bergerak ke atas (Scrolling ke atas di layar)
-                pyautogui.scroll(scroll_amount)
-                cv2.putText(frame, "SCROLL UP", (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-            else: # Tangan bergerak ke bawah (Scrolling ke bawah di layar)
-                pyautogui.scroll(-scroll_amount)
-                cv2.putText(frame, "SCROLL DOWN", (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-
-    # Perbarui posisi sebelumnya hanya jika gestur dinamis aktif, 
-    # atau reset jika gestur netral (ID 0) terdeteksi.
-    if pred_class in [8, 9, 15]:
         PREV_HAND_Y = hand_y
         PREV_HAND_X = hand_x
+        
     elif pred_class == 0:
         PREV_HAND_Y = None
         PREV_HAND_X = None
 # =========================================================
 
 
-print("🎥 Sistem Navigasi YouTube Gestur V4 Aktif...")
+print(f"🎥 Sistem Navigasi YouTube Gestur V6 Aktif ({NUM_CLASSES} Kelas Final)...")
 
 while True:
     ret, frame = cap.read()
@@ -167,13 +183,22 @@ while True:
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     results = hands.process(rgb)
     
-    label = "Menunggu Tangan..."
+    label = ""
     
     if not results.multi_hand_landmarks:
         PREDICTION_HISTORY = []
-        PREV_HAND_Y = None # Reset scroll/cursor state
+        PREV_HAND_Y = None # Reset kursor
         PREV_HAND_X = None
-        cv2.putText(frame, "❌ Tangan tidak terdeteksi", (70,240), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 3)
+        
+        # --- POSISI POJOK KANAN BAWAH: "Tangan tidak terdeteksi" ---
+        text_nt = "❌ Tangan tidak terdeteksi"
+        (text_width, text_height), baseline = cv2.getTextSize(text_nt, FONT_FACE, FONT_SIZE, FONT_THICKNESS + 2)
+        bottom_right_x = w - text_width - 10
+        bottom_right_y = h - 10
+        
+        # Tampilkan teks (Warna Merah untuk peringatan, Ukuran & Ketebalan Seragam)
+        cv2.putText(frame, text_nt, (bottom_right_x, bottom_right_y), FONT_FACE, FONT_SIZE, RED, FONT_THICKNESS + 1)
+        # --- END MODIFIKASI ---
 
     if results.multi_hand_landmarks:
         for hand_landmarks in results.multi_hand_landmarks:
@@ -190,58 +215,64 @@ while True:
             
             avg_pred = np.mean(PREDICTION_HISTORY, axis=0)
             
-            # Pastikan avg_pred memiliki dimensi yang benar sebelum argmax
-            if avg_pred.ndim > 1:
+            if avg_pred.ndim > 1 and avg_pred.shape[1] == NUM_CLASSES: 
                 pred_class = np.argmax(avg_pred[0])
                 confidence = avg_pred[0][pred_class]
             else:
-                 # Fallback jika model output tidak sesuai harapan
                 pred_class = 0 
                 confidence = 0.0
             
             color = (0, 0, 255) 
             
-            # Pemicu Aksi Statis
+            # Pemicu Aksi
             if confidence >= MIN_CONFIDENCE:
                 
-                # Panggil logika Kursor/Scroll (khusus untuk ID 8, 9, 15)
-                if pred_class in [8, 9, 15]:
-                    handle_cursor_and_scroll(frame, hand_landmarks, pred_class)
-                    color = (255, 100, 255) # Ungu untuk dinamis
+                if pred_class == 8:
+                    handle_cursor_movement(frame, hand_landmarks, pred_class)
+                    color = (255, 100, 255) # Ungu
                 
-                # Panggil logika Statis (selain ID 0, 8, 9, 15)
                 elif pred_class != 0:
                     activate_gesture_action(pred_class)
-                    color = (0, 255, 0) 
+                    color = (0, 255, 0) # Hijau
                 
-                # Gestur Default
                 elif pred_class == 0:
-                     color = (255, 255, 0)
+                     color = (255, 255, 0) # Kuning
                 
-                label = f"TERDETEKSI: {gestures[pred_class]} ({confidence*100:.1f}%)"
+                # --- LABEL STATUS UTAMA (Nama Gestur) ---
+                gesture_name_only = get_gesture_name(gestures[pred_class])
+                label = f"AKTIF: {gesture_name_only} ({confidence*100:.1f}%)"
                 
             else:
-                color = (0, 165, 255) 
-                label = f"Menganalisis: {gestures.get(pred_class, 'Unknown')} ({confidence*100:.1f}%)"
+                color = (0, 165, 255) # Oranye
+                gesture_name_only = get_gesture_name(gestures.get(pred_class, 'Unknown'))
+                label = f"Menganalisis: {gesture_name_only} ({confidence*100:.1f}%)"
             
-            # Visualisasi Keypoint
+            # Visualisasi Keypoint (Warna Keypoint ditentukan oleh status deteksi)
             mp_drawing.draw_landmarks(
                 frame, hand_landmarks, mp_hands.HAND_CONNECTIONS,
                 mp_drawing.DrawingSpec(color=color, thickness=2, circle_radius=2), 
                 mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2, circle_radius=2)
             )
 
-            # Tampilkan Feedback Gestur (UX)
+            # Tampilkan Feedback Gestur (Top 3 Prediksi)
             if 'avg_pred' in locals() and avg_pred.ndim > 1:
                 top_3_indices = np.argsort(avg_pred[0])[::-1][:3]
-                cv2.putText(frame, "Top 3 Prediksi:", (w-250, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                
+                # Header Top 3 (Pojok Kanan Atas - Y=20)
+                cv2.putText(frame, "Top 3 Prediksi:", (w-150, 20), FONT_FACE, FONT_SIZE, WHITE, FONT_THICKNESS)
+                
                 for i, idx in enumerate(top_3_indices):
-                    text_label = f"{gestures.get(idx, 'Unknown')}: {avg_pred[0][idx]*100:.1f}%"
-                    cv2.putText(frame, text_label, (w-250, 40 + i*30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                    # Tampilkan Nama Gestur di Top 3 (Pojok Kanan Atas, di bawah Header)
+                    gesture_name_top = get_gesture_name(gestures.get(idx, 'Unknown'))
+                    text_label = f"{gesture_name_top}: {avg_pred[0][idx]*100:.1f}%"
+                    # Koordinat X disesuaikan untuk rata kanan, Y disesuaikan untuk jarak antar baris
+                    cv2.putText(frame, text_label, (w-150, 40 + i*20), FONT_FACE, FONT_SIZE, WHITE, FONT_THICKNESS)
 
-    # Tampilkan Label Status
-    cv2.putText(frame, label, (20,40), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 0, 0), 3)
-    cv2.imshow('YouTube Gesture Controller V4', frame)
+    # Tampilkan Label Status Utama (Kiri Atas - Y=40)
+    # Menggunakan Ketebalan +1 agar lebih menonjol
+    cv2.putText(frame, label, (20, 40), FONT_FACE, FONT_SIZE, WHITE, FONT_THICKNESS + 1)
+    
+    cv2.imshow('YouTube Gesture Controller V6 (20 Classes)', frame)
 
     if cv2.waitKey(1) == ord('q'):
         break
