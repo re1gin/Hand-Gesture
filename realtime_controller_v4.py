@@ -250,7 +250,7 @@ def handle_cursor_movement(frame_shape, hand_landmarks):
     PREV_HAND_Y = hand_y
 # ======================================================================
 
-print(f"🚀 Sistem Aktif: GPU {os.environ.get('CUDA_VISIBLE_DEVICES', 'CPU')} | Multi-threaded | {NUM_CLASSES} Kelas")
+print(f" Sistem Aktif: GPU {os.environ.get('CUDA_VISIBLE_DEVICES', 'CPU')} | Multi-threaded | {NUM_CLASSES} Kelas")
 
 # ======================================================================
 # 10. MAIN LOOP

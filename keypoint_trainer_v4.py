@@ -93,7 +93,7 @@ checkpoint = ModelCheckpoint(MODEL_PATH, save_best_only=True,
 early_stop = EarlyStopping(monitor='val_loss', patience=20, verbose=1)
 
 # 5. PELATIHAN
-print("\nTraining dimulai...")
+print("\nTraining dimulai....")
 history = model.fit(
     X_train, y_train,
     epochs=100, 

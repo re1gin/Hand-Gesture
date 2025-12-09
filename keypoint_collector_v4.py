@@ -41,6 +41,7 @@ num_samples = 250
 # =====================================================
 # FUNGSI NORMALISASI KEYPOINT
 # =====================================================
+
 def normalize_keypoints(hand_landmarks):
     all_coords = np.array([[lm.x, lm.y, lm.z] for lm in hand_landmarks.landmark])
     wrist = all_coords[0, :2]
